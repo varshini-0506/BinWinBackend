@@ -242,5 +242,112 @@ def display_profile():
         logging.error(f"Profile retrieval error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+@app.route('/getcompanyprofile', methods=['POST'])
+def get_company_profile():
+    """Create or update company profile."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        company_name = data.get('company_name')
+        location = data.get('location')
+        coordinates = data.get('coordinates')
+        contact_number = data.get('contact_number')
+        profile_image = data.get('profile_image')
+        building_images = data.get('building_images')
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # Check if the company profile exists
+                cursor.execute("SELECT id FROM company_profile WHERE user_id = %s", (user_id,))
+                existing_profile = cursor.fetchone()
+
+                if existing_profile:
+                    # Update existing profile
+                    query = """
+                        UPDATE company_profile 
+                        SET company_name = %s, location = %s, coordinates = %s, contact_number = %s, 
+                            profile_image = %s, building_images = %s
+                        WHERE user_id = %s
+                        RETURNING id, user_id, company_name, location, coordinates, contact_number, 
+                                  profile_image, visit, building_images;
+                    """
+                    cursor.execute(query, (company_name, location, coordinates, contact_number, 
+                                           profile_image, building_images, user_id))
+                else:
+                    # Insert new company profile
+                    query = """
+                        INSERT INTO company_profile (user_id, company_name, location, coordinates, contact_number, 
+                                                     profile_image, visit, building_images)
+                        VALUES (%s, %s, %s, %s, %s, %s, 0, %s)
+                        RETURNING id, user_id, company_name, location, coordinates, contact_number, 
+                                  profile_image, visit, building_images;
+                    """
+                    cursor.execute(query, (user_id, company_name, location, coordinates, contact_number, 
+                                           profile_image, building_images))
+
+                profile = cursor.fetchone()
+                conn.commit()
+
+                return jsonify({
+                    "message": "Company profile created or updated successfully",
+                    "profile": {
+                        "id": profile[0],
+                        "user_id": profile[1],
+                        "company_name": profile[2],
+                        "location": profile[3],
+                        "coordinates": profile[4],
+                        "contact_number": profile[5],
+                        "profile_image": profile[6],
+                        "visit": profile[7],
+                        "building_images": profile[8]
+                    }
+                }), 200
+
+    except Exception as e:
+        logging.error(f"Company profile error: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/displaycompanyprofile', methods=['GET'])
+def display_company_profile():
+    """Retrieve and display a company profile."""
+    try:
+        user_id = request.args.get('user_id')  # Get user_id from query params
+
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                    SELECT id, user_id, company_name, location, coordinates, contact_number, 
+                           profile_image, visit, building_images
+                    FROM company_profile
+                    WHERE user_id = %s;
+                """
+                cursor.execute(query, (user_id,))
+                profile = cursor.fetchone()
+
+                if not profile:
+                    return jsonify({"error": "Company profile not found"}), 404
+
+                return jsonify({
+                    "message": "Company profile retrieved successfully",
+                    "profile": {
+                        "id": profile[0],
+                        "user_id": profile[1],
+                        "company_name": profile[2],
+                        "location": profile[3],
+                        "coordinates": profile[4],
+                        "contact_number": profile[5],
+                        "profile_image": profile[6],
+                        "visit": profile[7],
+                        "building_images": profile[8]
+                    }
+                }), 200
+
+    except Exception as e:
+        logging.error(f"Error retrieving company profile: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
