@@ -116,8 +116,8 @@ def get_profile():
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 query = """
-                    INSERT INTO user_profile (user_id, name, bio, location, age, profile_image, coordinates, level, points, visit, streaks)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0)
+                    INSERT INTO user_profile (user_id, name, bio, location, age, profile_image, coordinates, level, points, visit, streaks, waste_weight)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0)
                     ON CONFLICT (user_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     bio = EXCLUDED.bio,
@@ -145,7 +145,7 @@ def display_profile(user_id):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = "SELECT user_id, name, bio, location, age, profile_image, level, points, visit, streaks FROM user_profile WHERE user_id = %s"
+                query = "SELECT user_id, name, bio, location, age, profile_image, level, points, visit, streaks, waste_weight FROM user_profile WHERE user_id = %s"
                 cursor.execute(query, (user_id,))
                 profile = cursor.fetchone()
                 
@@ -164,7 +164,8 @@ def display_profile(user_id):
                         "level": profile[6],
                         "points": profile[7],
                         "visit": profile[8],
-                        "streaks": profile[9]
+                        "streaks": profile[9],
+                        "waste_weight":profile[10]
                     }
                 }), 200
     except Exception as e:
