@@ -138,74 +138,109 @@ def submit_score():
 
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
-    """Create a new profile or update if already exists."""
+    """Create or update user profile."""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')
+        user_id = data.get('user_id')  
         name = data.get('name')
         bio = data.get('bio')
         location = data.get('location')
-        age = data.get('age')
+        age = str(data.get('age'))  # Ensure age is stored as VARCHAR
         profile_image = data.get('profile_image')
         coordinates = data.get('coordinates')
-        
+
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = """
-                    INSERT INTO user_profile (user_id, name, bio, location, age, profile_image, coordinates, level, points, visit, streaks, waste_weight)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0)
-                    ON CONFLICT (user_id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    bio = EXCLUDED.bio,
-                    location = EXCLUDED.location,
-                    age = EXCLUDED.age,
-                    profile_image = EXCLUDED.profile_image,
-                    coordinates = EXCLUDED.coordinates
-                    RETURNING *
-                """
-                cursor.execute(query, (user_id, name, bio, location, age, profile_image, coordinates))
+                # Check if the profile exists by user_id
+                cursor.execute("SELECT id FROM user_profile WHERE user_id = %s", (user_id,))
+                existing_profile = cursor.fetchone()
+
+                if existing_profile:
+                    # Update existing profile
+                    query = """
+                        UPDATE user_profile 
+                        SET name = %s, bio = %s, location = %s, age = %s, profile_image = %s, coordinates = %s
+                        WHERE user_id = %s
+                        RETURNING id, user_id, name, bio, location, age, profile_image, coordinates, level, points, visit, streaks, waste_weight
+                    """
+                    cursor.execute(query, (name, bio, location, age, profile_image, coordinates, user_id))
+                else:
+                    # Insert new profile
+                    query = """
+                        INSERT INTO user_profile (user_id, name, bio, location, age, profile_image, coordinates, level, points, visit, streaks, waste_weight)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0)
+                        RETURNING id, user_id, name, bio, location, age, profile_image, coordinates, level, points, visit, streaks, waste_weight
+                    """
+                    cursor.execute(query, (user_id, name, bio, location, age, profile_image, coordinates))
+
                 profile = cursor.fetchone()
                 conn.commit()
-                
+
                 return jsonify({
                     "message": "Profile created or updated successfully",
-                    "profile": profile
+                    "profile": {
+                        "id": profile[0],  # Auto-generated ID
+                        "user_id": profile[1],
+                        "name": profile[2],
+                        "bio": profile[3],
+                        "location": profile[4],
+                        "age": profile[5],
+                        "profile_image": profile[6],
+                        "coordinates": profile[7],
+                        "level": profile[8],
+                        "points": profile[9],
+                        "visit": profile[10],
+                        "streaks": profile[11],
+                        "waste_weight": profile[12]
+                    }
                 }), 200
     except Exception as e:
         logging.error(f"Profile creation/update error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/displayprofile/<int:user_id>', methods=['GET'])
-def display_profile(user_id):
-    """Display profile details without coordinates."""
+
+@app.route('/displayprofile', methods=['GET'])
+def display_profile():
+    """Retrieve a user's profile by user_id."""
     try:
+        user_id = request.args.get('user_id')  # Get user_id from query params
+        
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 400
+
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = "SELECT user_id, name, bio, location, age, profile_image, level, points, visit, streaks, waste_weight FROM user_profile WHERE user_id = %s"
+                query = """
+                    SELECT id, user_id, name, bio, location, age, profile_image, coordinates, 
+                           level, points, visit, streaks, waste_weight 
+                    FROM user_profile WHERE user_id = %s
+                """
                 cursor.execute(query, (user_id,))
                 profile = cursor.fetchone()
-                
+
                 if not profile:
                     return jsonify({"error": "Profile not found"}), 404
-                
+
                 return jsonify({
-                    "message": "Profile retrieved successfully",
                     "profile": {
-                        "user_id": profile[0],
-                        "name": profile[1],
-                        "bio": profile[2],
-                        "location": profile[3],
-                        "age": profile[4],
-                        "profile_image": profile[5],
-                        "level": profile[6],
-                        "points": profile[7],
-                        "visit": profile[8],
-                        "streaks": profile[9],
-                        "waste_weight":profile[10]
+                        "id": profile[0],
+                        "user_id": profile[1],
+                        "name": profile[2],
+                        "bio": profile[3],
+                        "location": profile[4],
+                        "age": profile[5],
+                        "profile_image": profile[6],
+                        "coordinates": profile[7],
+                        "level": profile[8],
+                        "points": profile[9],
+                        "visit": profile[10],
+                        "streaks": profile[11],
+                        "waste_weight": profile[12]
                     }
                 }), 200
     except Exception as e:
         logging.error(f"Profile retrieval error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
