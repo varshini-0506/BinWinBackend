@@ -99,6 +99,42 @@ def login():
     except Exception as e:
         logging.error(f"Login error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        
+@app.route('/quiz_scores', methods=['POST'])
+def submit_score():
+    """Save the quiz score for a user."""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')  # User ID from frontend (ensure it's retrieved correctly after login)
+        score = data.get('score')
+
+        if not user_id or score is None:
+            return jsonify({"error": "User ID and score are required"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                INSERT INTO quiz_scores (user_id, score, time)
+                VALUES (%s, %s, NOW())
+                RETURNING id, user_id, score, time
+                """
+                cursor.execute(query, (user_id, score))
+                quiz_score = cursor.fetchone()
+                conn.commit()
+
+        return jsonify({
+            "message": "Quiz score submitted successfully",
+            "quiz_score": {
+                "quiz_id": quiz_score[0],
+                "user_id": quiz_score[1],
+                "score": quiz_score[2],
+                "time": quiz_score[3]
+            }
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Score submission error: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
