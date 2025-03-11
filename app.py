@@ -6,6 +6,10 @@ import logging
 from datetime import datetime
 from db_utils import get_db_connection
 from flask_cors import CORS
+from geopy.geocoders import Nominatim
+from urllib.parse import quote
+import time
+from opencage.geocoder import OpenCageGeocode
 
 app = Flask(__name__)  
 CORS(app)
@@ -136,6 +140,16 @@ def submit_score():
         logger.error(f"Score submission error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+def get_coordinates(location):
+    key = "a4f84f6c78c84eae943ae67ef91df333"  # Sign up at https://opencagedata.com/api
+    geocoder = OpenCageGeocode(key)
+    
+    result = geocoder.geocode(location)
+    if result:
+        return f"{result[0]['geometry']['lat']}, {result[0]['geometry']['lng']}"
+    
+    return None
+    
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
     """Create or update user profile."""
@@ -147,7 +161,8 @@ def get_profile():
         location = data.get('location')
         age = str(data.get('age'))  # Ensure age is stored as VARCHAR
         profile_image = data.get('profile_image')
-        coordinates = data.get('coordinates')
+        coordinates = get_coordinates(location) if location else None
+
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -348,6 +363,43 @@ def display_company_profile():
     except Exception as e:
         logging.error(f"Error retrieving company profile: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/getallprofile', methods=['GET'])
+def get_all_profiles():
+    """Fetch all user profiles."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = "SELECT * FROM user_profile"
+                cursor.execute(query)
+                profiles = cursor.fetchall()
+                
+                return jsonify({
+                    "message": "All user profiles retrieved successfully",
+                    "profiles": profiles
+                }), 200
+    except Exception as e:
+        logging.error(f"Error fetching profiles: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/getallcompanyprofile', methods=['GET'])
+def get_all_company_profiles():
+    """Fetch all company profiles."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = "SELECT * FROM company_profile"
+                cursor.execute(query)
+                company_profiles = cursor.fetchall()
+                
+                return jsonify({
+                    "message": "All company profiles retrieved successfully",
+                    "company_profiles": company_profiles
+                }), 200
+    except Exception as e:
+        logging.error(f"Error fetching company profiles: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
