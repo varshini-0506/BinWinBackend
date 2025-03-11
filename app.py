@@ -6,18 +6,9 @@ import logging
 from datetime import datetime
 from db_utils import get_db_connection
 from flask_cors import CORS
-<<<<<<< HEAD
-from geopy.geocoders import Nominatim
-from urllib.parse import quote
 import time
 from opencage.geocoder import OpenCageGeocode
-=======
-from ultralytics import YOLO
-import torchvision.transforms as transforms
-from PIL import Image
-import requests
 from io import BytesIO
->>>>>>> 33d9768755a4b08bc3e226987311e515cf894098
 
 app = Flask(__name__)  
 CORS(app)
@@ -25,44 +16,19 @@ CORS(app)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# cloudinary.config(
-#     cloud_name="dmpvchis3",
-#     api_key="685557167882957",
-#     api_secret="ttqAKZzmhHbOnOcRdlVL2sqILSc"
-# )
-
-# Load YOLO model
-model_path = "yolo_bins.pt"  # Ensure the correct model path
-model = YOLO(model_path)
-
-# Define image transformations
-transform = transforms.Compose([
-    transforms.Resize((640, 640)),  # Resize for YOLO
-    transforms.ToTensor(),  # Convert to tensor
-])
+HF_SPACE = "BinWin/BinWin" 
 
 def count_bins(image_url):
-    """Download and process the image to count the number of bins."""
+    """Send an image to the Hugging Face Space and get the bin count."""
     try:
-        response = requests.get(image_url, timeout=10)
-        response.raise_for_status()  
+        client = Client(HF_SPACE)
+        result = client.predict(
+            image=handle_file(image_url),  # Process image URL
+            api_name="/predict"  # Use correct API endpoint
+        )
 
-        image = Image.open(BytesIO(response.content)).convert("RGB")  # Convert to RGB
-
-        results = list(model(image, stream=True))  
-
-        if not results:  
-            print("❌ No objects detected.")
-            return 0
-
-        num_bins = len(results[0].boxes)  
-        print(f"🔢 Number of bins detected: {num_bins}")
-
-        return num_bins
-
-    except requests.exceptions.RequestException as req_err:
-        print(f"❌ HTTP request error: {str(req_err)}")
-        return None
+        print(f"✅ Bin count received: {result}")
+        return result  # This should now be a number
 
     except Exception as e:
         print(f"❌ Error processing image: {str(e)}")
