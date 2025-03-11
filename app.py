@@ -8,7 +8,7 @@ from db_utils import get_db_connection
 from flask_cors import CORS
 import time
 from opencage.geocoder import OpenCageGeocode
-from io import BytesIO
+from gradio_client import Client, handle_file
 
 app = Flask(__name__)  
 CORS(app)
