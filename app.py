@@ -282,10 +282,10 @@ def get_company_profile():
         user_id = data.get('user_id')
         company_name = data.get('company_name')
         location = data.get('location')
-        coordinates = data.get('coordinates')
         contact_number = data.get('contact_number')
         profile_image = data.get('profile_image')
         building_images = data.get('building_images')
+        coordinates = get_coordinates(location) if location else None
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
