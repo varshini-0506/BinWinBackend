@@ -430,3 +430,42 @@ def process_waste_image():
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+    
+@app.route('/leaderboard', methods=['GET'])
+def leaderboard():
+    """Endpoint to fetch the top 20 users sorted by points."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                    SELECT user_id, name, profile_image, points, streaks
+                    FROM users
+                    ORDER BY points DESC
+                    LIMIT 20
+                """
+                cursor.execute(query)
+                leaderboard_data = cursor.fetchall()
+
+                # Format response
+                leaderboard_list = [
+                    {
+                        "user_id": row[0],
+                        "name": row[1],
+                        "profile_pic": row[2] or "https://via.placeholder.com/100",
+                        "points": row[3],
+                        "streaks": row[4]
+                    } for row in leaderboard_data
+                ]
+
+                return jsonify({
+                    "message": "Leaderboard fetched successfully",
+                    "leaderboard": leaderboard_list
+                }), 200
+
+    except Exception as e:
+        logging.error(f"Leaderboard fetch error: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+# Run the Flask app
+if __name__ == '__main__':
+    app.run(debug=True)
