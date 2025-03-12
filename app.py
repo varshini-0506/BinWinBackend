@@ -102,10 +102,10 @@ def login():
         
 @app.route('/quiz_scores', methods=['POST'])
 def submit_score():
-    """Save the quiz score for a user."""
+    """Update total points in user_profile when a user completes a quiz."""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')  # User ID from frontend (ensure it's retrieved correctly after login)
+        user_id = data.get('user_id')  # Ensure it's retrieved correctly after login
         score = data.get('score')
 
         if not user_id or score is None:
@@ -113,27 +113,27 @@ def submit_score():
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = """
-                INSERT INTO quiz_scores (user_id, score, time)
-                VALUES (%s, %s, NOW())
-                RETURNING id, user_id, score, time
+                # Update the points in user_profile by adding the new score
+                update_query = """
+                UPDATE user_profile 
+                SET points = COALESCE(points, 0) + %s 
+                WHERE user_id = %s
+                RETURNING user_id, points
                 """
-                cursor.execute(query, (user_id, score))
-                quiz_score = cursor.fetchone()
+                cursor.execute(update_query, (score, user_id))
+                updated_user = cursor.fetchone()
                 conn.commit()
 
         return jsonify({
-            "message": "Quiz score submitted successfully",
-            "quiz_score": {
-                "quiz_id": quiz_score[0],
-                "user_id": quiz_score[1],
-                "score": quiz_score[2],
-                "time": quiz_score[3]
+            "message": "Quiz score updated successfully",
+            "user_profile": {
+                "user_id": updated_user[0],
+                "total_points": updated_user[1]
             }
-        }), 201
+        }), 200
 
     except Exception as e:
-        logger.error(f"Score submission error: {str(e)}")
+        logger.error(f"Score update error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 if __name__ == "__main__":
