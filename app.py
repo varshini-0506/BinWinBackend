@@ -439,7 +439,7 @@ def leaderboard():
             with conn.cursor() as cursor:
                 query = """
                     SELECT user_id, name, profile_image, points, streaks
-                    FROM users
+                    FROM user_profile
                     ORDER BY points DESC
                     LIMIT 20
                 """
