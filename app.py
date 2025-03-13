@@ -508,6 +508,72 @@ def leaderboard():
     except Exception as e:
         logging.error(f"Leaderboard fetch error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/getalluserprofile', methods=['GET'])
+def get_all_user_profiles():
+    """Fetch all users' profile coordinates, names, and bios."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = "SELECT user_id, name, bio, coordinates FROM user_profile WHERE coordinates IS NOT NULL"
+                cursor.execute(query)
+                profiles = cursor.fetchall()
+
+        # Format response
+        user_profiles = []
+        for profile in profiles:
+            user_id, name, bio, coordinates = profile  # Extract values from the tuple
+            if coordinates:
+                lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
+                user_profiles.append({
+                    "user_id": user_id,
+                    "name": name,
+                    "bio": bio,
+                    "latitude": lat,
+                    "longitude": lon
+                })
+
+        return jsonify({"locations": user_profiles}), 200
+    except Exception as e:
+        logging.error(f"Error fetching user profiles: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+
+@app.route('/displaycompany', methods=['GET'])
+def display_company_coordinates():
+    """Fetch coordinates for a specific company by user_id."""
+    try:
+        user_id = request.args.get('user_id')  # Get user_id from query params
+
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = "SELECT company_name, coordinates FROM company_profile WHERE user_id = %s AND coordinates IS NOT NULL"
+                cursor.execute(query, (user_id,))
+                company = cursor.fetchone()
+
+                if not company:
+                    return jsonify({"error": "Company profile not found or coordinates not available"}), 404
+
+                coordinates = company[1]  # Assuming stored as (latitude, longitude)
+                if coordinates:
+                    lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
+
+                    return jsonify({
+                        "user_id": user_id,
+                        "company_name": company[0],
+                        "latitude": lat,
+                        "longitude": lon
+                    }), 200
+
+        return jsonify({"error": "Company profile not found"}), 404
+
+    except Exception as e:
+        logging.error(f"Error fetching company coordinates: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # Run the Flask app
 if __name__ == "__main__":
