@@ -495,28 +495,35 @@ def get_all_user_profiles():
 
 @app.route('/displaycompany', methods=['GET'])
 def display_company_coordinates():
-    """Fetch all company coordinates."""
+    """Fetch coordinates for a specific company by user_id."""
     try:
+        user_id = request.args.get('user_id')  # Get user_id from query params
+
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 400
+
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = "SELECT user_id, company_name, coordinates FROM company_profile WHERE coordinates IS NOT NULL"
-                cursor.execute(query)
-                companies = cursor.fetchall()
+                query = "SELECT company_name, coordinates FROM company_profile WHERE user_id = %s AND coordinates IS NOT NULL"
+                cursor.execute(query, (user_id,))
+                company = cursor.fetchone()
 
-        # Format response
-        company_locations = []
-        for company in companies:
-            coordinates = company[2]  # Assuming stored as (latitude, longitude)
-            if coordinates:
-                lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
-                company_locations.append({
-                    "user_id": company[0],
-                    "company_name": company[1],
-                    "latitude": lat,
-                    "longitude": lon
-                })
+                if not company:
+                    return jsonify({"error": "Company profile not found or coordinates not available"}), 404
 
-        return jsonify({"companies": company_locations}), 200
+                coordinates = company[1]  # Assuming stored as (latitude, longitude)
+                if coordinates:
+                    lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
+
+                    return jsonify({
+                        "user_id": user_id,
+                        "company_name": company[0],
+                        "latitude": lat,
+                        "longitude": lon
+                    }), 200
+
+        return jsonify({"error": "Company profile not found"}), 404
+
     except Exception as e:
         logging.error(f"Error fetching company coordinates: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
