@@ -16,24 +16,41 @@ CORS(app)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-HF_SPACE = "BinWin/BinWin" 
+HF_BIN_DETECTION_SPACE = "BinWin/BinWin"
+HF_WASTE_CLASSIFICATION_SPACE = "BinWin/Wasteclassification"
 
 def count_bins(image_url):
     """Send an image to the Hugging Face Space and get the bin count."""
     try:
-        client = Client(HF_SPACE)
+        client = Client(HF_BIN_DETECTION_SPACE)
         result = client.predict(
-            image=handle_file(image_url),  # Process image URL
-            api_name="/predict"  # Use correct API endpoint
+            handle_file(image_url),  # Process image URL
+            api_name="/predict"
         )
 
         print(f"✅ Bin count received: {result}")
-        return result  # This should now be a number
+        return int(result)  # Ensure we return the bin count
 
     except Exception as e:
         print(f"❌ Error processing image: {str(e)}")
         return None
 
+def classify_waste(image_url):
+    """Send an image to the Hugging Face Space for waste classification."""
+    try:
+        client = Client(HF_WASTE_CLASSIFICATION_SPACE)
+        result = client.predict(
+            handle_file(image_url),  # Process image URL
+            api_name="/predict"
+        )
+
+        print(f"✅ Classification result: {result}")
+        return result
+
+    except Exception as e:
+        print(f"❌ Error classifying waste: {str(e)}")
+        return "error"
+    
 @app.route('/signup', methods=['POST'])
 def signup():
     """Endpoint for user signup."""
@@ -388,24 +405,52 @@ def process_waste_image():
         data = request.get_json()
         level = data.get('level')
         front_view = data.get('front_view')  # URL of front view image
-        top_view = data.get('top_view')  # URL of top view image
+        top_views = data.get('top_views')    # List of top view images
         user_id = data.get('user_id')
 
-        if not level or not front_view or not top_view or not user_id:
+        if not all([level, front_view, top_views, user_id]):
             return jsonify({"error": "All fields are required"}), 400
 
-        # Count bins using YOLO on the front_view image
+        if not isinstance(top_views, list) or len(top_views) > 3:
+            return jsonify({"error": "top_views must be a list of max 3 URLs"}), 400
+
+        # Step 1: Count bins using YOLO on the front_view image
         bin_count = count_bins(front_view)
 
         if bin_count is None:
-            return jsonify({"error": "Error processing image"}), 500
+            return jsonify({"error": "Error processing front view image"}), 500
 
-        if bin_count != 3:
-            return jsonify({"message": f"Image does not meet the required criteria. Bins detected: {bin_count}","data":bin_count}), 400
+        # Step 2: Validate the number of bins
+        if bin_count != len(top_views):
+            return jsonify({
+                "message": f"Mismatch: {bin_count} bins detected but {len(top_views)} top views provided.",
+                "detected_bins": bin_count
+            }), 400
 
-        combined_images = f"{front_view},{top_view}"
+         # Step 3: Classify waste in each bin
+        classification_results = [classify_waste(tv) for tv in top_views]
 
-        # Store data in Neon DB
+        # Check if any classification contains more than one unique class (not properly sorted)
+        improperly_sorted = any(len(set(result)) > 1 for result in classification_results)
+
+        # Check if all classifications are unique
+        unique_classes = len(set(tuple(sorted(set(result))) for result in classification_results)) == len(classification_results)
+
+        if improperly_sorted:
+            return jsonify({
+                "message": "Waste is not properly sorted. Some bins contain multiple distinct classes.",
+                "classification_results": classification_results
+            }), 400
+
+        if not unique_classes:
+            return jsonify({
+                "message": "Waste is not properly sorted. Duplicate waste classes found across bins.",
+                "classification_results": classification_results
+            }), 400
+
+        combined_images = f"{front_view},{','.join(top_views)}"
+
+        # Step 4: Store data in Neon DB
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 current_time = datetime.now(pytz.utc)
@@ -414,22 +459,20 @@ def process_waste_image():
                     VALUES (%s, %s, %s, %s)
                     RETURNING id
                 """
-                cursor.execute(query, (user_id, level, combined_images , current_time))
+                cursor.execute(query, (user_id, level, combined_images, current_time))
                 image_id = cursor.fetchone()[0]
                 conn.commit()
 
                 return jsonify({
-                    "message": "3 bin detected and image uploaded successfully",
-                    "data":3,
+                    "message": "Bins detected, images uploaded, and classification done successfully",
+                    "detected_bins": bin_count,
+                    "classification_results": classification_results,
                     "image_id": image_id
                 }), 201
 
     except Exception as e:
         logging.error(f"Process waste image error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
     
 @app.route('/leaderboard', methods=['GET'])
 def leaderboard():
@@ -467,5 +510,5 @@ def leaderboard():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # Run the Flask app
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
