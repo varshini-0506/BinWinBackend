@@ -472,18 +472,19 @@ def get_all_user_profiles():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = "SELECT user_id, coordinates FROM user_profile WHERE coordinates IS NOT NULL"
+                query = "SELECT user_id, user_name, coordinates FROM user_profile WHERE coordinates IS NOT NULL"
                 cursor.execute(query)
                 profiles = cursor.fetchall()
 
         # Format response
         user_profiles = []
         for profile in profiles:
-            coordinates = profile[1]  # Assuming stored as (latitude, longitude)
+            coordinates = profile[2]  # Assuming stored as (latitude, longitude)
             if coordinates:
                 lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
                 user_profiles.append({
                     "user_id": profile[0],
+                    "user_name": profile[1],  # Include user_name
                     "latitude": lat,
                     "longitude": lon
                 })
