@@ -468,23 +468,24 @@ def leaderboard():
     
 @app.route('/getalluserprofile', methods=['GET'])
 def get_all_user_profiles():
-    """Fetch all users' profile coordinates."""
+    """Fetch all users' profile coordinates, names, and bios."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = "SELECT user_id, name, coordinates FROM user_profile WHERE coordinates IS NOT NULL"
+                query = "SELECT user_id, name, bio, coordinates FROM user_profile WHERE coordinates IS NOT NULL"
                 cursor.execute(query)
                 profiles = cursor.fetchall()
 
         # Format response
         user_profiles = []
         for profile in profiles:
-            coordinates = profile[2]  # Assuming stored as (latitude, longitude)
+            user_id, name, bio, coordinates = profile  # Extract values from the tuple
             if coordinates:
                 lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
                 user_profiles.append({
-                    "user_id": profile[0],
-                    "name": profile[1],  # Include user_name
+                    "user_id": user_id,
+                    "name": name,
+                    "bio": bio,
                     "latitude": lat,
                     "longitude": lon
                 })
@@ -493,6 +494,8 @@ def get_all_user_profiles():
     except Exception as e:
         logging.error(f"Error fetching user profiles: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
 
 @app.route('/displaycompany', methods=['GET'])
 def display_company_coordinates():
