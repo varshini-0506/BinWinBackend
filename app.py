@@ -465,6 +465,34 @@ def leaderboard():
     except Exception as e:
         logging.error(f"Leaderboard fetch error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/getalluserprofile', methods=['GET'])
+def get_all_user_profiles():
+    """Fetch all users' profile coordinates."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = "SELECT user_id, coordinates FROM user_profile WHERE coordinates IS NOT NULL"
+                cursor.execute(query)
+                profiles = cursor.fetchall()
+
+        # Format response
+        user_profiles = []
+        for profile in profiles:
+            coordinates = profile[1]  # Assuming stored as (latitude, longitude)
+            if coordinates:
+                lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
+                user_profiles.append({
+                    "user_id": profile[0],
+                    "latitude": lat,
+                    "longitude": lon
+                })
+
+        return jsonify({"locations": user_profiles}), 200
+    except Exception as e:
+        logging.error(f"Error fetching user profiles: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 # Run the Flask app
 if __name__ == '__main__':
