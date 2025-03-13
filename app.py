@@ -123,10 +123,10 @@ def login():
     
 @app.route('/quiz_scores', methods=['POST'])
 def submit_score():
-    """Save the quiz score for a user."""
+    """Update total points in user_profile when a user completes a quiz."""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')  # User ID from frontend (ensure it's retrieved correctly after login)
+        user_id = data.get('user_id')  # Ensure it's retrieved correctly after login
         score = data.get('score')
 
         if not user_id or score is None:
@@ -134,27 +134,27 @@ def submit_score():
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                query = """
-                INSERT INTO quiz_scores (user_id, score, time)
-                VALUES (%s, %s, NOW())
-                RETURNING id, user_id, score, time
+                # Update the points in user_profile by adding the new score
+                update_query = """
+                UPDATE user_profile 
+                SET points = COALESCE(points, 0) + %s 
+                WHERE user_id = %s
+                RETURNING user_id, points
                 """
-                cursor.execute(query, (user_id, score))
-                quiz_score = cursor.fetchone()
+                cursor.execute(update_query, (score, user_id))
+                updated_user = cursor.fetchone()
                 conn.commit()
 
         return jsonify({
-            "message": "Quiz score submitted successfully",
-            "quiz_score": {
-                "quiz_id": quiz_score[0],
-                "user_id": quiz_score[1],
-                "score": quiz_score[2],
-                "time": quiz_score[3]
+            "message": "Quiz score updated successfully",
+            "user_profile": {
+                "user_id": updated_user[0],
+                "total_points": updated_user[1]
             }
-        }), 201
+        }), 200
 
     except Exception as e:
-        logger.error(f"Score submission error: {str(e)}")
+        logger.error(f"Score update error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 def get_coordinates(location):
@@ -282,10 +282,10 @@ def get_company_profile():
         user_id = data.get('user_id')
         company_name = data.get('company_name')
         location = data.get('location')
-        coordinates = data.get('coordinates')
         contact_number = data.get('contact_number')
         profile_image = data.get('profile_image')
         building_images = data.get('building_images')
+        coordinates = get_coordinates(location) if location else None
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -430,3 +430,42 @@ def process_waste_image():
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+    
+@app.route('/leaderboard', methods=['GET'])
+def leaderboard():
+    """Endpoint to fetch the top 20 users sorted by points."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                    SELECT user_id, name, profile_image, points, streaks
+                    FROM user_profile
+                    ORDER BY points DESC
+                    LIMIT 20
+                """
+                cursor.execute(query)
+                leaderboard_data = cursor.fetchall()
+
+                # Format response
+                leaderboard_list = [
+                    {
+                        "user_id": row[0],
+                        "name": row[1],
+                        "profile_pic": row[2] or "https://via.placeholder.com/100",
+                        "points": row[3],
+                        "streaks": row[4]
+                    } for row in leaderboard_data
+                ]
+
+                return jsonify({
+                    "message": "Leaderboard fetched successfully",
+                    "leaderboard": leaderboard_list
+                }), 200
+
+    except Exception as e:
+        logging.error(f"Leaderboard fetch error: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+# Run the Flask app
+if __name__ == '__main__':
+    app.run(debug=True)
