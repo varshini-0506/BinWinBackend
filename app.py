@@ -493,6 +493,33 @@ def get_all_user_profiles():
         logging.error(f"Error fetching user profiles: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+@app.route('/displaycompany', methods=['GET'])
+def display_company_coordinates():
+    """Fetch all company coordinates."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = "SELECT user_id, company_name, coordinates FROM company_profile WHERE coordinates IS NOT NULL"
+                cursor.execute(query)
+                companies = cursor.fetchall()
+
+        # Format response
+        company_locations = []
+        for company in companies:
+            coordinates = company[2]  # Assuming stored as (latitude, longitude)
+            if coordinates:
+                lat, lon = map(float, coordinates.strip("()").split(","))  # Convert to float
+                company_locations.append({
+                    "user_id": company[0],
+                    "company_name": company[1],
+                    "latitude": lat,
+                    "longitude": lon
+                })
+
+        return jsonify({"companies": company_locations}), 200
+    except Exception as e:
+        logging.error(f"Error fetching company coordinates: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # Run the Flask app
 if __name__ == '__main__':
