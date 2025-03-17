@@ -80,7 +80,7 @@ def signup():
     except Exception as e:
         logging.error(f"Signup error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/login', methods=['POST'])
 def login():
     """Endpoint for user login."""
@@ -170,7 +170,7 @@ def get_coordinates(location):
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
     """Create or update user profile."""
-    try:
+    try: 
         data = request.get_json()
         user_id = data.get('user_id')  
         name = data.get('name')
@@ -531,6 +531,42 @@ def display_company_coordinates():
     except Exception as e:
         logging.error(f"Error fetching company coordinates: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/schedule', methods=['POST'])
+def schedule_pickup():
+    """Schedule a pickup by storing user_id, company_id, date, and time."""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        company_id = data.get('company_id')
+        date = data.get('date')
+        time = data.get('time')
+
+        if not user_id or not company_id or not date or not time:
+            return jsonify({"error": "All fields (user_id, company_id, date, time) are required"}), 400
+
+        # Convert date and time to correct format
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d")
+            time_obj = datetime.strptime(time, "%H:%M")
+        except ValueError:
+            return jsonify({"error": "Invalid date or time format"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                    INSERT INTO schedule (user_id, company_id, date, time)
+                    VALUES (%s, %s, %s, %s)
+                """
+                cursor.execute(query, (user_id, company_id, date_obj, time_obj))
+                conn.commit()
+
+        return jsonify({"message": "Pickup scheduled successfully"}), 201
+
+    except Exception as e:
+        logging.error(f"Error scheduling pickup: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 # Run the Flask app
 if __name__ == '__main__':
