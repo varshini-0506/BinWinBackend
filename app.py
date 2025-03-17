@@ -97,7 +97,7 @@ def signup():
     except Exception as e:
         logging.error(f"Signup error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/login', methods=['POST'])
 def login():
     """Endpoint for user login."""
@@ -187,7 +187,7 @@ def get_coordinates(location):
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
     """Create or update user profile."""
-    try:
+    try: 
         data = request.get_json()
         user_id = data.get('user_id')  
         name = data.get('name')
