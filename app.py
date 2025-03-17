@@ -538,8 +538,6 @@ def get_all_user_profiles():
         logging.error(f"Error fetching user profiles: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-
-
 @app.route('/displaycompany', methods=['GET'])
 def display_company_coordinates():
     """Fetch coordinates for a specific company by user_id."""
@@ -573,6 +571,35 @@ def display_company_coordinates():
 
     except Exception as e:
         logging.error(f"Error fetching company coordinates: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/companySchedule', methods=['POST'])
+def create_schedule():
+    """Insert scheduling data into the scheduling table."""
+    try:
+        data = request.get_json()
+        company_id = data.get('company_id')
+        user_id = data.get('user_id')
+        date = data.get('date')
+        time = data.get('time')
+
+        # Validate input
+        if not all([company_id, user_id, date, time]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                INSERT INTO scheduling (company_id, user_id, date, time)
+                VALUES (%s, %s, %s, %s)
+                """
+                cursor.execute(query, (company_id, user_id, date, time))
+                conn.commit()
+
+        return jsonify({"message": "Schedule created successfully"}), 201
+
+    except Exception as e:
+        logging.error(f"Error inserting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # Run the Flask app
