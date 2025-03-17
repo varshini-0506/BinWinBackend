@@ -555,7 +555,7 @@ def schedule_pickup():
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 query = """
-                    INSERT INTO schedule (user_id, company_id, date, time)
+                    INSERT INTO scheduling (user_id, company_id, date, time)
                     VALUES (%s, %s, %s, %s)
                 """
                 cursor.execute(query, (user_id, company_id, date_obj, time_obj))
