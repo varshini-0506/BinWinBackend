@@ -602,6 +602,47 @@ def create_schedule():
         logging.error(f"Error inserting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
+@app.route('/displayuserSchedule', methods=['GET'])
+def get_user_schedule():
+    """Fetch schedule details and corresponding company profiles for a given user_id."""
+    try:
+        user_id = request.args.get('user_id')
+
+        # Validate input
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                SELECT s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price
+                FROM scheduling s
+                JOIN company_profile c ON s.company_id = c.user_id
+                WHERE s.user_id = %s
+                """
+                cursor.execute(query, (user_id,))
+                results = cursor.fetchall()
+
+        # Format the output
+        schedules = [
+            {
+                "company_id": row[0],
+                "date": row[1].strftime('%Y-%m-%d'),
+                "time": str(row[2]),
+                "company_name": row[3],
+                "contact_number": row[4],
+                "profile_image": row[5],
+                "price": row[6]
+            }
+            for row in results
+        ]
+
+        return jsonify({"schedules": schedules}), 200
+
+    except Exception as e:
+        logging.error(f"Error fetching schedule: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 # Run the Flask app
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
