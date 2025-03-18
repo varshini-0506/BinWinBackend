@@ -537,8 +537,6 @@ def get_all_user_profiles():
         logging.error(f"Error fetching user profiles: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-
-
 @app.route('/displaycompany', methods=['GET'])
 def display_company_coordinates():
     """Fetch coordinates for a specific company by user_id."""
@@ -574,39 +572,120 @@ def display_company_coordinates():
         logging.error(f"Error fetching company coordinates: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
     
-@app.route('/schedule', methods=['POST'])
-def schedule_pickup():
-    """Schedule a pickup by storing user_id, company_id, date, and time."""
+@app.route('/companySchedule', methods=['POST'])
+def create_schedule():
+    """Insert scheduling data into the scheduling table."""
     try:
-        data = request.json
-        user_id = data.get('user_id')
+        data = request.get_json()
         company_id = data.get('company_id')
+        user_id = data.get('user_id')
         date = data.get('date')
         time = data.get('time')
 
-        if not user_id or not company_id or not date or not time:
-            return jsonify({"error": "All fields (user_id, company_id, date, time) are required"}), 400
-
-        # Convert date and time to correct format
-        try:
-            date_obj = datetime.strptime(date, "%Y-%m-%d")
-            time_obj = datetime.strptime(time, "%H:%M")
-        except ValueError:
-            return jsonify({"error": "Invalid date or time format"}), 400
+        # Validate input
+        if not all([company_id, user_id, date, time]):
+            return jsonify({"error": "Missing required fields"}), 400
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 query = """
-                    INSERT INTO scheduling (user_id, company_id, date, time)
-                    VALUES (%s, %s, %s, %s)
+                INSERT INTO scheduling (company_id, user_id, date, time)
+                VALUES (%s, %s, %s, %s)
                 """
-                cursor.execute(query, (user_id, company_id, date_obj, time_obj))
+                cursor.execute(query, (company_id, user_id, date, time))
                 conn.commit()
 
-        return jsonify({"message": "Pickup scheduled successfully"}), 201
+        return jsonify({"message": "Schedule created successfully"}), 201
 
     except Exception as e:
-        logging.error(f"Error scheduling pickup: {str(e)}")
+        logging.error(f"Error inserting schedule: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/displayuserSchedule', methods=['GET'])
+def get_user_schedule():
+    """Fetch schedule details and corresponding company profiles for a given user_id."""
+    try:
+        user_id = request.args.get('user_id')
+
+        # Validate input
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                SELECT s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price
+                FROM scheduling s
+                JOIN company_profile c ON s.company_id = c.user_id
+                WHERE s.user_id = %s
+                """
+                cursor.execute(query, (user_id,))
+                results = cursor.fetchall()
+
+        # Format the output
+        schedules = [
+            {
+                "company_id": row[0],
+                "date": row[1].strftime('%Y-%m-%d'),
+                "time": str(row[2]),
+                "company_name": row[3],
+                "contact_number": row[4],
+                "profile_image": row[5],
+                "price": row[6]
+            }
+            for row in results
+        ]
+
+        return jsonify({"schedules": schedules}), 200
+
+    except Exception as e:
+        logging.error(f"Error fetching schedule: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/acceptSchedule', methods=['POST'])
+def accept_schedule():
+    """Accept a schedule and update visit counts."""
+    try:
+        data = request.get_json()
+        company_id = data.get('company_id')
+        user_id = data.get('user_id')
+
+        if not company_id or not user_id:
+            return jsonify({"error": "Missing company_id or user_id"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # Update scheduling table to set status as accepted
+                cursor.execute("""
+                    UPDATE scheduling 
+                    SET status = 'accepted' 
+                    WHERE company_id = %s AND user_id = %s
+                """, (company_id, user_id))
+
+                # Check if any row was updated
+                if cursor.rowcount == 0:
+                    return jsonify({"error": "No matching schedule found"}), 404
+
+                # Increment visit count in user_profile
+                cursor.execute("""
+                    UPDATE user_profile 
+                    SET visit = visit + 1 
+                    WHERE user_id = %s
+                """, (user_id,))
+
+                # Increment visit count in company_profile
+                cursor.execute("""
+                    UPDATE company_profile 
+                    SET visit = visit + 1 
+                    WHERE company_id = %s
+                """, (company_id,))
+
+                conn.commit()
+
+        return jsonify({"message": "Schedule accepted successfully"}), 200
+
+    except Exception as e:
+        logging.error(f"Error accepting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
