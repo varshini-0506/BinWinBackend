@@ -137,7 +137,7 @@ def login():
     except Exception as e:
         logging.error(f"Login error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/quiz_scores', methods=['POST'])
 def submit_score():
     """Update total points in user_profile when a user completes a quiz."""
@@ -183,7 +183,7 @@ def get_coordinates(location):
         return f"{result[0]['geometry']['lat']}, {result[0]['geometry']['lng']}"
     
     return None
-    
+
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
     """Create or update user profile."""
@@ -246,8 +246,7 @@ def get_profile():
     except Exception as e:
         logging.error(f"Profile creation/update error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
+    
 @app.route('/displayprofile', methods=['GET'])
 def display_profile():
     """Retrieve a user's profile by user_id."""
@@ -397,7 +396,7 @@ def display_company_profile():
     except Exception as e:
         logging.error(f"Error retrieving company profile: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/wasteUpload', methods=['POST'])
 def process_waste_image():
     """Endpoint to process waste images and store in Neon DB."""
@@ -690,6 +689,85 @@ def get_company_schedule():
 
     except Exception as e:
         logging.error(f"Error fetching schedule: {str(e)}")
+@app.route('/acceptSchedule', methods=['POST'])
+def accept_schedule():
+    """Accept a schedule and update visit counts."""
+    try:
+        data = request.get_json()
+        company_id = data.get('company_id')
+        user_id = data.get('user_id')
+
+        if not company_id or not user_id:
+            return jsonify({"error": "Missing company_id or user_id"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # Update scheduling table to set status as accepted
+                cursor.execute("""
+                    UPDATE scheduling 
+                    SET status = 'accepted' 
+                    WHERE company_id = %s AND user_id = %s
+                """, (company_id, user_id))
+
+                # Check if any row was updated
+                if cursor.rowcount == 0:
+                    return jsonify({"error": "No matching schedule found"}), 404
+
+                # Increment visit count in user_profile
+                cursor.execute("""
+                    UPDATE user_profile 
+                    SET visit = visit + 1 
+                    WHERE user_id = %s
+                """, (user_id,))
+
+                # Increment visit count in company_profile
+                cursor.execute("""
+                    UPDATE company_profile 
+                    SET visit = visit + 1 
+                    WHERE user_id = %s
+                """, (company_id,))
+
+                conn.commit()
+
+        return jsonify({"message": "Schedule accepted successfully"}), 200
+
+    except Exception as e:
+        logging.error(f"Error accepting schedule: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/rejectSchedule', methods=['POST'])
+def reject_schedule():
+    """Reject a schedule and update the reason and date."""
+    try:
+        data = request.get_json()
+        company_id = data.get('company_id')
+        user_id = data.get('user_id')
+        reason = data.get('reason')
+        new_date = data.get('date')  # Updated date
+
+        # Validate input
+        if not all([company_id, user_id, reason, new_date]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # Update the scheduling table to mark as rejected, store reason, and update date
+                cursor.execute("""
+                    UPDATE scheduling 
+                    SET status = 'rejected', reason = %s, date = %s
+                    WHERE company_id = %s AND user_id = %s
+                """, (reason, new_date, company_id, user_id))
+
+                # Check if any row was updated
+                if cursor.rowcount == 0:
+                    return jsonify({"error": "No matching schedule found"}), 404
+
+                conn.commit()
+
+        return jsonify({"message": "Schedule rejected successfully"}), 200
+
+    except Exception as e:
+        logging.error(f"Error rejecting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # Run the Flask app
