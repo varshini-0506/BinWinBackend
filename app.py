@@ -614,7 +614,7 @@ def get_user_schedule():
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 query = """
-                SELECT s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price
+                SELECT s.id , s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price
                 FROM scheduling s
                 JOIN company_profile c ON s.company_id = c.user_id
                 WHERE s.user_id = %s
@@ -625,13 +625,14 @@ def get_user_schedule():
         # Format the output
         schedules = [
             {
-                "company_id": row[0],
-                "date": row[1].strftime('%Y-%m-%d'),
-                "time": str(row[2]),
-                "company_name": row[3],
-                "contact_number": row[4],
-                "profile_image": row[5],
-                "price": row[6]
+                "schedule_id": row[0],
+                "company_id": row[1],
+                "date": row[2].strftime('%Y-%m-%d'),
+                "time": str(row[3]),
+                "company_name": row[4],
+                "contact_number": row[5],
+                "profile_image": row[6],
+                "price": row[7]
             }
             for row in results
         ]
@@ -642,6 +643,52 @@ def get_user_schedule():
         logging.error(f"Error fetching schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
     
+@app.route('/displayCompanySchedule', methods=['GET'])
+def get_company_schedule():
+    """Fetch schedule details and corresponding user profiles for a given company_id."""
+    try:
+        user_id = request.args.get('user_id')
+
+        # Validate input
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Fetch schedule and user profile details
+            query = """
+                SELECT s.user_id, s.reason, s.status, s.date, s.time, u.name, u.location, u.profile_image , s.id
+                FROM scheduling s
+                JOIN user_profile u ON s.user_id = u.user_id
+                WHERE s.company_id = %s
+            """
+            cursor.execute(query, (user_id,))
+            results = cursor.fetchall()
+
+        # Format the output
+        schedules = [
+            {
+                "user_id": row[0],
+                "reason": row[1],
+                "status": row[2],
+                "date": row[3],
+                "time": row[4].strftime('%H:%M:%S') if row[4] else None,
+                "name": row[5],
+                "location": row[6],
+                "profile_image": row[7],
+                "schedule_id": row[8]
+            }
+            for row in results
+        ]
+
+        if not schedules:
+            return jsonify({"message": "No records found"}), 404
+
+        return jsonify({"schedules": schedules}), 200
+
+    except Exception as e:
+        logging.error(f"Error fetching schedule: {str(e)}")
 @app.route('/acceptSchedule', methods=['POST'])
 def accept_schedule():
     """Accept a schedule, update visit counts, and use correct DB column name."""
