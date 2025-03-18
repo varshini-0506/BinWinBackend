@@ -137,7 +137,7 @@ def login():
     except Exception as e:
         logging.error(f"Login error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/quiz_scores', methods=['POST'])
 def submit_score():
     """Update total points in user_profile when a user completes a quiz."""
@@ -183,7 +183,7 @@ def get_coordinates(location):
         return f"{result[0]['geometry']['lat']}, {result[0]['geometry']['lng']}"
     
     return None
-    
+
 @app.route('/getprofile', methods=['POST'])
 def get_profile():
     """Create or update user profile."""
@@ -246,8 +246,7 @@ def get_profile():
     except Exception as e:
         logging.error(f"Profile creation/update error: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
+    
 @app.route('/displayprofile', methods=['GET'])
 def display_profile():
     """Retrieve a user's profile by user_id."""
@@ -397,7 +396,7 @@ def display_company_profile():
     except Exception as e:
         logging.error(f"Error retrieving company profile: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/wasteUpload', methods=['POST'])
 def process_waste_image():
     """Endpoint to process waste images and store in Neon DB."""
