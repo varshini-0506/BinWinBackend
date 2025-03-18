@@ -644,14 +644,16 @@ def get_user_schedule():
     
 @app.route('/acceptSchedule', methods=['POST'])
 def accept_schedule():
-    """Accept a schedule and update visit counts."""
+    """Accept a schedule, update visit counts, and use correct DB column name."""
     try:
         data = request.get_json()
+        scheduling_id = data.get('id')  # Match DB column name
         company_id = data.get('company_id')
         user_id = data.get('user_id')
 
-        if not company_id or not user_id:
-            return jsonify({"error": "Missing company_id or user_id"}), 400
+        # Validate input
+        if not all([scheduling_id, company_id, user_id]):
+            return jsonify({"error": "Missing id, company_id, or user_id"}), 400
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -659,8 +661,8 @@ def accept_schedule():
                 cursor.execute("""
                     UPDATE scheduling 
                     SET status = 'accepted' 
-                    WHERE company_id = %s AND user_id = %s
-                """, (company_id, user_id))
+                    WHERE id = %s AND company_id = %s AND user_id = %s
+                """, (scheduling_id, company_id, user_id))
 
                 # Check if any row was updated
                 if cursor.rowcount == 0:
@@ -687,29 +689,30 @@ def accept_schedule():
     except Exception as e:
         logging.error(f"Error accepting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-    
+
 @app.route('/rejectSchedule', methods=['POST'])
 def reject_schedule():
-    """Reject a schedule and update the reason and date."""
+    """Reject a schedule, update the reason, and update the date."""
     try:
         data = request.get_json()
+        scheduling_id = data.get('id')  # Match DB column name
         company_id = data.get('company_id')
         user_id = data.get('user_id')
         reason = data.get('reason')
         new_date = data.get('date')  # Updated date
 
         # Validate input
-        if not all([company_id, user_id, reason, new_date]):
+        if not all([scheduling_id, company_id, user_id, reason, new_date]):
             return jsonify({"error": "Missing required fields"}), 400
 
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                # Update the scheduling table to mark as rejected, store reason, and update date
+                # Update scheduling table to set status as rejected, store reason, and update date
                 cursor.execute("""
                     UPDATE scheduling 
                     SET status = 'rejected', reason = %s, date = %s
-                    WHERE company_id = %s AND user_id = %s
-                """, (reason, new_date, company_id, user_id))
+                    WHERE id = %s AND company_id = %s AND user_id = %s
+                """, (reason, new_date, scheduling_id, company_id, user_id))
 
                 # Check if any row was updated
                 if cursor.rowcount == 0:
@@ -722,6 +725,7 @@ def reject_schedule():
     except Exception as e:
         logging.error(f"Error rejecting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 # Run the Flask app
 if __name__ == "__main__":
