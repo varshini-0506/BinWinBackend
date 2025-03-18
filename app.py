@@ -687,7 +687,41 @@ def accept_schedule():
     except Exception as e:
         logging.error(f"Error accepting schedule: {str(e)}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+@app.route('/rejectSchedule', methods=['POST'])
+def reject_schedule():
+    """Reject a schedule and update the reason and date."""
+    try:
+        data = request.get_json()
+        company_id = data.get('company_id')
+        user_id = data.get('user_id')
+        reason = data.get('reason')
+        new_date = data.get('date')  # Updated date
 
+        # Validate input
+        if not all([company_id, user_id, reason, new_date]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # Update the scheduling table to mark as rejected, store reason, and update date
+                cursor.execute("""
+                    UPDATE scheduling 
+                    SET status = 'rejected', reason = %s, date = %s
+                    WHERE company_id = %s AND user_id = %s
+                """, (reason, new_date, company_id, user_id))
+
+                # Check if any row was updated
+                if cursor.rowcount == 0:
+                    return jsonify({"error": "No matching schedule found"}), 404
+
+                conn.commit()
+
+        return jsonify({"message": "Schedule rejected successfully"}), 200
+
+    except Exception as e:
+        logging.error(f"Error rejecting schedule: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 # Run the Flask app
 if __name__ == "__main__":
