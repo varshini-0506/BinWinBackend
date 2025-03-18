@@ -677,7 +677,7 @@ def accept_schedule():
                 cursor.execute("""
                     UPDATE company_profile 
                     SET visit = visit + 1 
-                    WHERE company_id = %s
+                    WHERE user_id = %s
                 """, (company_id,))
 
                 conn.commit()
