@@ -617,7 +617,7 @@ def get_user_schedule():
                 SELECT s.id , s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price
                 FROM scheduling s
                 JOIN company_profile c ON s.company_id = c.user_id
-                WHERE s.user_id = %s AND s.status = 'no'
+                WHERE s.user_id = %s
                 """
                 cursor.execute(query, (user_id,))
                 results = cursor.fetchall()
