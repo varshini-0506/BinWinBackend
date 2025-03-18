@@ -614,7 +614,7 @@ def get_user_schedule():
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
                 query = """
-                SELECT s.id , s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price
+                SELECT s.id , s.company_id, s.date, s.time, c.company_name, c.contact_number, c.profile_image, c.price, s.status
                 FROM scheduling s
                 JOIN company_profile c ON s.company_id = c.user_id
                 WHERE s.user_id = %s
@@ -632,7 +632,8 @@ def get_user_schedule():
                 "company_name": row[4],
                 "contact_number": row[5],
                 "profile_image": row[6],
-                "price": row[7]
+                "price": row[7],
+                "status": row[8]
             }
             for row in results
         ]
